@@ -1,0 +1,26 @@
+# Apache hosting. Works at a domain root or in a subfolder.
+Options -Indexes
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # /api/analyze -> api/analyze.php, same routes as the Node server
+  RewriteRule ^api/(analyze|task|mask|config)$ api/$1.php [L,QSA]
+  # never serve the helper directly
+  RewriteRule ^api/_lib\.php$ - [R=404,L]
+</IfModule>
+
+<IfModule mod_headers.c>
+  Header always set Permissions-Policy "camera=(self)"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set X-Content-Type-Options "nosniff"
+</IfModule>
+
+<IfModule mod_mime.c>
+  AddType application/manifest+json .webmanifest
+  AddType text/javascript .js
+</IfModule>
+
+# never serve dotfiles or config
+<FilesMatch "^\.|puolisko-config">
+  Require all denied
+</FilesMatch>

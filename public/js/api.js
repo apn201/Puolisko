@@ -18,13 +18,13 @@ async function req(path, init = {}) {
 }
 
 export async function config() {
-  try { return await (await fetch('/api/config')).json(); } catch { return { needsCode: false, configured: false }; }
+  try { return await (await fetch('api/config')).json(); } catch { return { needsCode: false, configured: false }; }
 }
 
 // Send one JPEG data URL, wait for the result. onProgress gets short status strings.
 export async function analyse(dataUrl, onProgress = () => {}) {
   onProgress('Sending photo to YouCam Skin AI');
-  const { taskId } = await (await req('/api/analyze', {
+  const { taskId } = await (await req('api/analyze', {
     method: 'POST',
     body: JSON.stringify({ image: dataUrl, contentType: 'image/jpeg' }),
   })).json();
@@ -32,7 +32,7 @@ export async function analyse(dataUrl, onProgress = () => {}) {
   const started = Date.now();
   for (let i = 0; ; i++) {
     await sleep(i < 5 ? 1500 : 3000);
-    const r = await (await req(`/api/task?id=${encodeURIComponent(taskId)}`)).json();
+    const r = await (await req(`api/task?id=${encodeURIComponent(taskId)}`)).json();
     if (r.status === 'success') return r.output;
     if (r.status === 'error') throw new Error(explain(r.error));
     if (Date.now() - started > 120000) throw new Error('YouCam took over two minutes. Try again later.');
@@ -41,7 +41,7 @@ export async function analyse(dataUrl, onProgress = () => {}) {
 
 // Mask pixels, via the proxy so the canvas is not tainted.
 export async function maskImageData(url) {
-  const blob = await (await req(`/api/mask?u=${encodeURIComponent(url)}`)).blob();
+  const blob = await (await req(`api/mask?u=${encodeURIComponent(url)}`)).blob();
   const bmp = await createImageBitmap(blob);
   const c = document.createElement('canvas');
   c.width = bmp.width; c.height = bmp.height;

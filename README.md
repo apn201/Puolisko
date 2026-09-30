@@ -62,17 +62,28 @@ npm run scan              # secret scan of the working tree and the whole git hi
 
 Phone cameras need HTTPS, so test the camera on the deployed URL. Import works on localhost.
 
-## Deploy (Vercel)
+## Deploy
 
-1. Import this repo in Vercel. No build command; output directory is `public` (set in `vercel.json`).
-2. Project Settings → Environment Variables: `YOUCAM_API_KEY`, and optionally `ACCESS_CODE`
-   so strangers cannot spend the unit budget.
-3. Deploy. The `api/` functions hold the key; it never reaches the browser.
+### Apache + PHP (how the entry is hosted)
+
+1. Copy the contents of `public/` to a folder on the server (root or subfolder, both work).
+   `public/.htaccess` maps `api/analyze` to `api/analyze.php` and so on; needs mod_rewrite, PHP 7.4+ with curl.
+2. Put the key in a file **outside** the web root, one level above DOCUMENT_ROOT:
+   ```php
+   <?php return ['YOUCAM_API_KEY' => '...', 'ACCESS_CODE' => '...'];
+   ```
+   named `puolisko-config.php`, or point `SetEnv PUOLISKO_CONFIG /path/to/file.php` at it, or `SetEnv YOUCAM_API_KEY` in the vhost.
+3. HTTPS is required: phone browsers only allow the camera on secure origins.
+
+### Vercel (alternative)
+
+Import the repo, set `YOUCAM_API_KEY` and `ACCESS_CODE` as environment variables. `api/*.js` run as functions.
 
 ## Layout
 
 ```
-api/            serverless functions: analyze, task (poll), mask (proxy), config
+api/            Node functions (local server, Vercel): analyze, task, mask, config
+public/api/     the same four endpoints in PHP, for Apache
 lib/youcam.js   the only code that talks to YouCam
 public/         the app: plain HTML, CSS, JS modules, no build step
 public/lab.html spike page: mask split vs mirror composite, repeatability
