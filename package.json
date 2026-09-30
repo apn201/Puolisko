@@ -1,0 +1,14 @@
+{
+  "name": "puolisko",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Split-face product testing with the YouCam Skin AI API",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "dev": "node server.js",
+    "test": "node --test test/*.test.js",
+    "scan": "node scripts/secret-scan.mjs"
+  },
+  "license": "MIT"
+}

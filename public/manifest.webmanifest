@@ -1,0 +1,10 @@
+{
+  "name": "Puolisko",
+  "short_name": "Puolisko",
+  "description": "Split-face product testing. Your own face as its own control group.",
+  "start_url": "./#home",
+  "display": "standalone",
+  "background_color": "#f6f4ef",
+  "theme_color": "#f6f4ef",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

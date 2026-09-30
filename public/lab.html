@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Puolisko Lab</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="lab">
+  <header class="top"><a href="./" class="brand">Puolisko Lab</a></header>
+  <main>
+    <section class="card stack">
+      <h1>Can one face be scored per side?</h1>
+      <p class="small">The YouCam Skin AI API scores the whole face. This page tests two ways to get a score per half,
+        on your own photos. Every analysis costs 12 units. Nothing is saved.</p>
+      <ol class="small">
+        <li><b>Mask split</b> (what the app uses): one call, then split each concern's detection mask at the midline.</li>
+        <li><b>Mirror composite</b> (the fallback): build a face from each half plus its reflection, two calls, compare whole-face scores.</li>
+        <li><b>Repeatability</b>: load 2 to 4 photos taken a minute apart. The spread of L &minus; R between them is the measurement noise.</li>
+      </ol>
+      <label>Photos <input type="file" accept="image/jpeg,image/png" multiple id="files"></label>
+      <label class="small">Midline (image coordinates, not mirrored) <input type="range" id="mid" min="0.35" max="0.65" step="0.005" value="0.5"></label>
+      <label class="small">Access code (if the server needs one) <input type="password" id="code" autocomplete="off"></label>
+      <div id="thumbs" class="row"></div>
+      <div class="row">
+        <button class="btn primary" id="runMask">Mask split, all photos</button>
+        <button class="btn" id="runMirror">Mirror composite, first photo (24 units)</button>
+      </div>
+      <p class="status" id="status" role="status"></p>
+      <p class="small muted">Units spent this session: <b id="units">0</b></p>
+    </section>
+    <section class="card" id="out" hidden>
+      <h2>Mask split</h2>
+      <div class="table-wrap"><table id="maskTable"></table></div>
+      <p class="small" id="maskNotes"></p>
+    </section>
+    <section class="card" id="outMirror" hidden>
+      <h2>Mirror composite vs mask split</h2>
+      <div class="table-wrap"><table id="mirrorTable"></table></div>
+    </section>
+    <section class="card" id="rawWrap" hidden>
+      <h2>Raw results</h2>
+      <pre id="raw"></pre>
+    </section>
+  </main>
+  <script type="module" src="js/lab.js"></script>
+</body>
+</html>
