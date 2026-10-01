@@ -1,20 +1,27 @@
 import * as store from './store.js';
 import * as api from './api.js';
-import { toPortrait, fileToCanvas, toJpeg, lightBalance, OUT_W, OUT_H } from './image.js';
-import { scoreSides } from './split.js';
-import { analyse } from './stats.js';
-import { sidesChart, diffChart } from './chart.js';
-
-const CONCERNS = ['redness', 'acne', 'pore', 'texture', 'age_spot', 'oiliness'];
-const LABEL = { redness: 'Redness', acne: 'Acne', pore: 'Pores', texture: 'Texture', age_spot: 'Spots', oiliness: 'Oiliness' };
-const PLAN_DAYS = 14;
+import { toPortrait, fileToCanvas, lightBalance, OUT_W, OUT_H } from './image.js';
+import { scan } from './scan.js';
+import { preload } from './landmarks.js';
+import { CONCERNS, LABEL, result, sideScores, pickBeautyCheek, otherCheek } from './game.js';
+import { renderHeatmap, COLORS } from './heatmap.js';
+import { renderCard, shareCard, signed } from './card.js';
 
 const state = store.load();
 api.setAccessCode(state.accessCode);
 const view = document.getElementById('view');
 let cfg = { needsCode: false, configured: true };
 let stream = null;
-let queue = []; // photos waiting for review: { canvas, date, source, light }
+let pending = null;   // { canvas, mode } waiting to be scanned
+let lastScan = null;  // { photo, masks, face } of the final scan. Memory only: gone on reload, by design.
+
+const QUIPS = [
+  'The AI is looking very closely.',
+  'Counting wrinkles you drew yourself.',
+  'Measuring redness, pixel by pixel.',
+  'Checking under the eyes.',
+  'Splitting you down the middle.',
+];
 
 // ---- helpers -----------------------------------------------------------------------------
 
@@ -27,15 +34,6 @@ function mount(id) {
   return f;
 }
 
-const bName = () => state.run?.bName || 'nothing';
-const bCheek = () => (state.run?.aCheek === 'left' ? 'right' : 'left');
-// Displayed images are mirrored, like a mirror. So the user's left cheek shows on screen left,
-// and in the raw (unmirrored) image the user's left cheek is on the image's right.
-const aImageSide = (swapped) => {
-  const aOnScreenLeft = (state.run.aCheek === 'left') !== swapped;
-  return aOnScreenLeft ? 'imgRight' : 'imgLeft';
-};
-
 function banner(text) {
   const b = document.getElementById('banner');
   b.textContent = text || '';
@@ -47,237 +45,155 @@ function stopCamera() {
   stream = null;
 }
 
-const fmt = (v, d = 1) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d);
+// Label for the half shown on screen left/right. Screens are mirrored like a mirror,
+// so the player's left cheek is on screen left.
+const roleOf = (cheek) => (cheek === state.beautyCheek ? 'BEAUTY' : 'BEAST');
 
 // ---- screens -----------------------------------------------------------------------------
 
 const screens = {
-  intro() { mount('t-intro'); },
-
-  setup() {
-    const f = mount('t-setup');
-    const form = view.querySelector('#setup-form');
-    const demo = view.querySelector('.split-demo .face');
-    const sync = () => demo.classList.toggle('flip', form.aCheek.value === 'right');
-    form.addEventListener('change', sync);
-    form.addEventListener('submit', (e) => {
-      e.preventDefault();
-      if (state.entries.length && !confirm('Start over? The current test\'s numbers will be deleted. Export them first if you want them.')) return;
-      store.startRun(state, {
-        aName: form.aName.value.trim(),
-        bName: form.bName.value.trim(),
-        aCheek: form.aCheek.value,
-      });
-      location.hash = '#home';
-    });
-    return f;
-  },
-
   home() {
     const f = mount('t-home');
-    const r = state.run;
-    f.aName.textContent = r.aName;
-    f.bName.textContent = bName();
-    f.aCheek.textContent = `${r.aCheek} cheek`;
-    f.bCheek.textContent = `${bCheek()} cheek`;
-    const res = analyse(state.entries, CONCERNS);
-    const n = state.entries.length;
-    const day = res.days;
-    f.bar.style.width = `${Math.min(100, (day / PLAN_DAYS) * 100)}%`;
-    f.dayText.textContent = n
-      ? `${n} photo${n === 1 ? '' : 's'} over ${day} day${day === 1 ? '' : 's'}. Plan: ${PLAN_DAYS} days.`
-      : `No photos yet. Plan: ${PLAN_DAYS} days.`;
-    const doneToday = state.entries.some((e) => e.date === store.today());
-    f.todayText.textContent = doneToday
-      ? 'Today\'s photo is done. A retake replaces it.'
-      : 'Apply both products as usual, wait until they have absorbed, then take the photo.';
-    if (doneToday) f.captureBtn.textContent = 'Retake today\'s photo';
-    f.import.addEventListener('change', async () => {
-      const files = [...f.import.files];
-      queue = [];
-      for (const file of files) {
-        const canvas = await fileToCanvas(file);
-        queue.push({
-          canvas,
-          date: store.today(new Date(file.lastModified)),
-          source: 'import',
-          light: lightBalance(canvas, canvas.width, canvas.height),
-        });
-      }
-      if (queue.length) location.hash = '#review';
-    });
-    f.miniResult.append(verdictBlock(res, true));
+    if (state.last?.result) f.last.hidden = false;
+    preload();
   },
 
-  async capture() {
-    const f = mount('t-capture');
-    const aLeft = state.run.aCheek === 'left';
-    f.lblL.textContent = aLeft ? `A · ${state.run.aName}` : `B · ${bName()}`;
-    f.lblR.textContent = aLeft ? `B · ${bName()}` : `A · ${state.run.aName}`;
-    const video = view.querySelector('video');
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1440 } },
-        audio: false,
-      });
-    } catch (e) {
-      f.light.textContent = 'No camera access. Allow the camera, or use Import photos on the home screen.';
-      f.light.className = 'light bad';
-      return;
-    }
-    video.srcObject = stream;
-    await video.play().catch(() => {});
+  start() {
+    if (!state.seenPrivacy) return screens.privacy('baseline');
+    location.hash = '#baseline';
+  },
 
-    const tick = () => {
-      if (!stream || !video.videoWidth) return;
-      // Measure on the same 3:4 crop we will send.
-      const c = toPortrait(video, video.videoWidth, video.videoHeight);
-      const lb = lightBalance(c, OUT_W, OUT_H);
-      const bad = lb.mean < 70 || lb.imbalance > 0.15;
-      f.light.className = `light ${bad ? 'bad' : 'ok'}`;
-      f.light.textContent = lb.mean < 70 ? 'Too dark' : lb.imbalance > 0.15
-        ? `Light is uneven (${Math.round(lb.imbalance * 100)}%). Face the light head-on.`
-        : 'Light is even';
-    };
-    const timer = setInterval(tick, 400);
-    const stopTimer = () => clearInterval(timer);
-    window.addEventListener('hashchange', stopTimer, { once: true });
-
-    f.shoot.addEventListener('click', () => {
-      if (!video.videoWidth) return;
-      const canvas = toPortrait(video, video.videoWidth, video.videoHeight);
-      queue = [{ canvas, date: store.today(), source: 'camera', light: lightBalance(canvas, OUT_W, OUT_H) }];
-      stopTimer();
-      stopCamera();
-      location.hash = '#review';
+  privacy(next) {
+    const f = mount('t-privacy');
+    f.ok.textContent = next ? 'Got it. Scan my bare face.' : 'Got it';
+    f.ok.addEventListener('click', () => {
+      state.seenPrivacy = true;
+      store.save(state);
+      location.hash = next ? `#${next}` : '#home';
     });
   },
 
-  review() {
-    if (!queue.length) { location.hash = '#home'; return; }
-    const item = queue[0];
-    const f = mount('t-review');
-    let swapped = false;
-    if (queue.length > 1) f.title.textContent = `Check the split (${queue.length} to go)`;
+  baseline() { capture('baseline'); },
 
-    // Show mirrored, as in a mirror.
+  final() {
+    if (!state.baseline || !state.beautyCheek) { location.hash = '#start'; return; }
+    capture('final');
+  },
+
+  scanning() {
+    if (!pending) { location.hash = '#home'; return; }
+    const { canvas, mode } = pending;
+    const f = mount('t-scanning');
     const c = f.canvas;
-    c.width = item.canvas.width; c.height = item.canvas.height;
+    c.width = canvas.width; c.height = canvas.height;
     const ctx = c.getContext('2d');
     ctx.translate(c.width, 0); ctx.scale(-1, 1);
-    ctx.drawImage(item.canvas, 0, 0);
+    ctx.drawImage(canvas, 0, 0);
+    let q = 0;
+    f.quip.textContent = QUIPS[0];
+    const timer = setInterval(() => { f.quip.textContent = QUIPS[++q % QUIPS.length]; }, 2600);
+    window.addEventListener('hashchange', () => clearInterval(timer), { once: true });
+    f.again.addEventListener('click', () => { location.hash = `#${mode}`; });
 
-    f.date.value = item.date;
-    f.date.max = store.today();
-    const labels = () => {
-      const aLeft = (state.run.aCheek === 'left') !== swapped;
-      f.labelL.textContent = aLeft ? `A · ${state.run.aName}` : `B · ${bName()}`;
-      f.labelR.textContent = aLeft ? `B · ${bName()}` : `A · ${state.run.aName}`;
-      f.labelL.className = aLeft ? 'lbl-a' : 'lbl-b';
-      f.labelR.className = aLeft ? 'lbl-b' : 'lbl-a';
-    };
-    const moveLine = () => { f.midline.style.left = `${f.mid.value * 100}%`; };
-    labels(); moveLine();
-    f.mid.addEventListener('input', moveLine);
-    f.swap.addEventListener('click', () => { swapped = !swapped; labels(); });
-
-    if (item.light.imbalance > 0.15) {
-      f.lightWarn.hidden = false;
-      f.lightWarn.textContent = `One side is ${Math.round(item.light.imbalance * 100)}% brighter than the other. Side light is the one thing split-face cannot cancel. Retake facing the light if you can.`;
-    }
-
-    const next = () => {
-      queue.shift();
-      location.hash = queue.length ? '#review' : '#home';
-      if (queue.length) screens.review();
-    };
-    f.cancel.addEventListener('click', next);
-
-    f.score.addEventListener('click', async () => {
-      f.score.disabled = f.cancel.disabled = f.swap.disabled = f.mid.disabled = true;
-      const status = (t) => { f.status.textContent = t; };
-      try {
-        // Display is mirrored, the image is not: flip the midline back to image coordinates.
-        const midFrac = 1 - Number(f.mid.value);
-        const aSide = aImageSide(swapped);
-        const output = await api.analyse(toJpeg(item.canvas), status);
-        status('Splitting the masks');
-        const masks = {};
-        for (const c of CONCERNS) {
-          const url = output[c]?.mask_urls?.[0];
-          if (url) masks[c] = await api.maskImageData(url);
-        }
-        const { sides, meta } = scoreSides(masks, { width: OUT_W, height: OUT_H, midFrac }, aSide);
-        if (!Object.keys(sides).length) throw new Error('No masks came back, so the sides could not be split.');
-        const whole = {};
-        for (const [k, v] of Object.entries(output)) whole[k] = { ui: v.ui_score, raw: v.raw_score };
-        store.addEntry(state, {
-          date: f.date.value || item.date,
-          ts: Date.now(),
-          source: item.source,
-          midFrac: Math.round(midFrac * 1000) / 1000,
-          aSide,
-          light: { imbalance: Math.round(item.light.imbalance * 1000) / 1000, mean: Math.round(item.light.mean) },
-          whole,
-          sides,
-          meta,
-        });
-        // The photo is dropped here. Nothing but the numbers above is kept.
-        item.canvas.width = item.canvas.height = 0;
-        c.width = c.height = 0;
-        status('Saved. Photo discarded.');
-        setTimeout(next, 700);
-      } catch (e) {
-        if (e.status === 401) {
-          status('This deployment needs an access code. Enter it in Settings.');
+    scan(canvas, (t) => { f.status.textContent = t; })
+      .then((s) => {
+        clearInterval(timer);
+        pending = null;
+        if (mode === 'baseline') {
+          state.baseline = { at: Date.now(), halves: store.numbersOnly(s.halves) };
+          state.beautyCheek = pickBeautyCheek();
+          state.last = null;
+          lastScan = null;
+          store.save(state);
+          location.hash = '#coin';
         } else {
-          status(e.message || 'Something went wrong.');
+          const r = result(state.baseline.halves, s.halves, state.beautyCheek);
+          state.last = { at: Date.now(), halves: store.numbersOnly(s.halves), result: r };
+          store.save(state);
+          lastScan = { photo: canvas, masks: s.masks, face: s.face, line: s.meta.line };
+          location.hash = '#result';
         }
-        f.score.disabled = f.cancel.disabled = f.swap.disabled = f.mid.disabled = false;
-      }
-    });
+      })
+      .catch((e) => {
+        clearInterval(timer);
+        f.status.textContent = e.status === 401 ? 'This demo needs an access code. Add it in Settings.' : e.message;
+        f.quip.textContent = mode === 'final'
+          ? 'If heavy paint hid your face from the AI, tone it down a little and try again. No units were used.'
+          : 'No units were used for a failed scan.';
+        f.retry.hidden = false;
+        view.querySelector('.sweep')?.remove();
+      });
   },
 
-  results() {
-    if (!state.run) { location.hash = '#intro'; return; }
-    const f = mount('t-results');
-    const res = analyse(state.entries, CONCERNS);
-    f.verdict.append(verdictBlock(res, false));
-    f.legend.innerHTML = '';
-    f.legend.append(
-      legendItem('a', `A · ${state.run.aName} (${state.run.aCheek})`),
-      legendItem('b', `B · ${bName()} (${bCheek()})`),
-      legendItem('d', 'A − B'),
-    );
+  coin() {
+    if (!state.baseline || !state.beautyCheek) { location.hash = '#start'; return; }
+    const f = mount('t-coin');
+    const base = sideScores(state.baseline.halves, state.beautyCheek);
+    f.offset.textContent = signed(base.diff);
+    f.beautyCheek.textContent = state.beautyCheek;
+    f.beastCheek.textContent = otherCheek(state.beautyCheek);
+    f.coin.classList.add(state.beautyCheek === 'left' ? 'land-left' : 'land-right');
+    setTimeout(() => {
+      f.verdict.textContent = `Beauty: ${state.beautyCheek}. Beast: ${otherCheek(state.beautyCheek)}.`;
+      f.sides.hidden = false;
+    }, 1900);
+  },
 
-    for (const c of CONCERNS) {
-      const r = res.perConcern[c];
-      if (!r || r.n < 2) continue;
-      const card = document.createElement('section');
-      card.className = 'card concern';
-      const h = document.createElement('h2');
-      h.textContent = LABEL[c];
-      const p = document.createElement('p');
-      p.className = 'small';
-      p.textContent = concernLine(r);
-      card.append(h, sidesChart(r), diffChart(r), p);
-      f.concerns.append(card);
+  result() {
+    const last = state.last?.result;
+    if (!last) { location.hash = '#home'; return; }
+    const f = mount('t-result');
+    f.title.textContent = last.title;
+    f.gap.textContent = signed(last.gap);
+    const fill = (el, cheek) => {
+      const role = roleOf(cheek);
+      el.classList.add(role === 'BEAUTY' ? 'beauty' : 'beast');
+      el.querySelector('.name').textContent = role;
+      el.querySelector('.num').textContent = (role === 'BEAUTY' ? last.beauty : last.beast).toFixed(1);
+    };
+    fill(f.scoreL, 'left');
+    fill(f.scoreR, 'right');
+    f.offsetNote.textContent = `Skin score per half, 0 to 100. Gap = Beauty − Beast − your bare-face difference (${signed(last.offset)}).`;
+
+    f.breakdown.innerHTML = '<tr><th></th><th class="beauty">Beauty</th><th class="beast">Beast</th></tr>';
+    for (const p of last.perConcern) {
+      const tr = document.createElement('tr');
+      const ch = (v) => (v == null ? '' : ` <span class="muted">(${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(1)}%)</span>`);
+      tr.innerHTML = `<td><i class="sw" style="background:${COLORS[p.concern]}"></i>${LABEL[p.concern]}</td>` +
+        `<td>${p.beautyPixels.toLocaleString()} px${ch(p.beautyChange)}</td><td>${p.beastPixels.toLocaleString()} px${ch(p.beastChange)}</td>`;
+      f.breakdown.append(tr);
+    }
+    f.legend.innerHTML = CONCERNS.map((c) => `<span><i class="sw" style="background:${COLORS[c]}"></i>${LABEL[c]}</span>`).join('');
+
+    if (!lastScan) {
+      f.heatWrap.hidden = true;
+      f.shareRow.hidden = true;
+      f.shareNote.textContent = 'The photo was deleted when the page reloaded, so there is nothing to share. Rescan to make a card.';
+      view.querySelectorAll('.chip').forEach((n) => { n.hidden = true; });
+      return;
     }
 
-    for (const e of [...state.entries].reverse()) {
-      const li = document.createElement('li');
-      const warn = e.light?.imbalance > 0.15 ? ' · uneven light' : '';
-      li.innerHTML = `<span>${e.date}</span><span class="muted small">${e.source}${warn}</span>`;
-      const del = document.createElement('button');
-      del.className = 'link';
-      del.textContent = 'Remove';
-      del.addEventListener('click', () => {
-        if (confirm(`Remove the numbers for ${e.date}?`)) { store.removeEntry(state, e.date); screens.results(); }
-      });
-      li.append(del);
-      f.entries.append(li);
-    }
-    if (!state.entries.length) f.entries.innerHTML = '<li class="muted">None yet.</li>';
+    const draw = () => {
+      const heat = renderHeatmap(lastScan.photo, lastScan.masks, lastScan.line, { withFace: !f.shy.checked });
+      f.heat.width = heat.width; f.heat.height = heat.height;
+      f.heat.getContext('2d').drawImage(heat, 0, 0);
+      return heat;
+    };
+    draw();
+    f.tagL.textContent = roleOf('left');
+    f.tagR.textContent = roleOf('right');
+    f.tagL.className = `tag-l ${roleOf('left').toLowerCase()}`;
+    f.tagR.className = `tag-r ${roleOf('right').toLowerCase()}`;
+    f.shy.addEventListener('change', draw);
+
+    f.share.addEventListener('click', async () => {
+      const format = view.querySelector('input[name=fmt]:checked').value;
+      const heat = renderHeatmap(lastScan.photo, lastScan.masks, lastScan.line, { withFace: !f.shy.checked });
+      const url = (location.host + location.pathname).replace(/index\.html$/, '').replace(/\/$/, '');
+      const card = renderCard(heat, last, state.beautyCheek, { format, url });
+      const how = await shareCard(card, `puolisko-${format}.png`);
+      f.shareNote.textContent = how === 'downloaded' ? 'Saved as a PNG. Post it wherever you like.' : '';
+    });
   },
 
   settings() {
@@ -288,80 +204,70 @@ const screens = {
       state.accessCode = f.code.value.trim();
       api.setAccessCode(state.accessCode);
       store.save(state);
+      banner('');
     });
-    f.export.addEventListener('click', () => {
-      const blob = new Blob([store.exportJson(state)], { type: 'application/json' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `puolisko-${store.today()}.json`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    });
-    f.load.addEventListener('change', async () => {
-      try {
-        store.importJson(state, await f.load.files[0].text());
-        location.hash = '#results';
-      } catch (e) { alert(e.message); }
-    });
-    f.newRun.addEventListener('click', () => { location.hash = '#setup'; });
     f.wipe.addEventListener('click', () => {
-      if (!confirm('Delete every number Puolisko has stored in this browser?')) return;
+      if (!confirm('Delete your baseline and scores from this phone?')) return;
       store.wipe();
-      location.hash = '#intro';
+      location.hash = '#home';
       location.reload();
     });
   },
-
-  privacy() { mount('t-privacy'); },
 };
 
-// ---- result text -------------------------------------------------------------------------
+// ---- capture -----------------------------------------------------------------------------
 
-function verdictBlock(res, compact) {
-  const box = document.createElement('div');
-  const h = document.createElement(compact ? 'h2' : 'h1');
-  const p = document.createElement('p');
-  box.append(h, p);
-  const a = state.run.aName, b = bName();
-  if (res.verdict === 'too-early') {
-    h.textContent = 'Too early to say';
-    p.textContent = `${res.photos} photo${res.photos === 1 ? '' : 's'} so far. The first honest statement needs at least 5 photos on 3 different days, and skin needs about two weeks.`;
-  } else if (res.verdict === 'null') {
-    h.textContent = `No measurable difference after ${res.days} days`;
-    p.textContent = `Across ${res.tested} skin measures, ${a} and ${b} left your two cheeks the same, within what the measurement can tell apart. This is the most common result, and a useful one.`;
-  } else {
-    const hits = Object.entries(res.perConcern).filter(([, r]) => r.significant);
-    h.textContent = `A difference in ${hits.map(([c]) => LABEL[c].toLowerCase()).join(', ')}`;
-    const lines = hits.map(([c, r]) => `${LABEL[c]}: the ${r.favours === 'a' ? a : b} side did better`);
-    p.textContent = `${lines.join('. ')}. ${res.tested - hits.length} of ${res.tested} measures showed no difference. One photo series on one face is a lead, not proof.`;
+async function capture(mode) {
+  const f = mount('t-capture');
+  f.title.textContent = mode === 'baseline' ? 'Bare face. No makeup.' : 'Final scan. Show the AI what you did.';
+  if (mode === 'final') {
+    f.lblL.textContent = roleOf('left');
+    f.lblR.textContent = roleOf('right');
+    f.lblL.classList.add(roleOf('left').toLowerCase());
+    f.lblR.classList.add(roleOf('right').toLowerCase());
   }
-  if (!compact && res.noiseRemoved != null && res.noiseRemoved > 0) {
-    const n = document.createElement('p');
-    n.className = 'small noise';
-    n.textContent = `Your whole face moved from day to day, with light, sleep and camera. Comparing the halves removed about ${Math.round(res.noiseRemoved * 100)}% of that noise.`;
-    box.append(n);
-  }
-  if (compact && res.photos) {
-    const l = document.createElement('a');
-    l.href = '#results'; l.className = 'small'; l.textContent = 'See the charts';
-    box.append(l);
-  }
-  return box;
-}
+  preload();
 
-function concernLine(r) {
-  if (!r.fit) return `${r.n} photos. Needs at least 5 on 3 days for a statement.`;
-  const who = r.favours === 'a' ? state.run.aName : bName();
-  const range = `${fmt(r.ci[0])} to ${fmt(r.ci[1])}`;
-  if (!r.significant) return `A − B moved ${fmt(r.change)} points over ${r.span} days (interval ${range}). Crosses zero: no measurable difference.`;
-  return `A − B moved ${fmt(r.change)} points over ${r.span} days (interval ${range}). The ${who} side is doing better. Lower is better.`;
-}
+  const go = (canvas) => {
+    stopCamera();
+    pending = { canvas, mode };
+    location.hash = '#scanning';
+  };
 
-function legendItem(cls, text) {
-  const s = document.createElement('span');
-  s.innerHTML = `<i class="sw series-${cls}"></i>`;
-  s.append(text);
-  return s;
+  f.file.addEventListener('change', async () => {
+    const file = f.file.files[0];
+    if (file) go(await fileToCanvas(file));
+  });
+
+  const video = view.querySelector('video');
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1440 } },
+      audio: false,
+    });
+  } catch {
+    f.light.textContent = 'No camera access. Allow the camera, or use a photo.';
+    f.light.className = 'light bad';
+    f.shoot.disabled = true;
+    return;
+  }
+  video.srcObject = stream;
+  await video.play().catch(() => {});
+
+  const timer = setInterval(() => {
+    if (!stream || !video.videoWidth) return;
+    const lb = lightBalance(toPortrait(video, video.videoWidth, video.videoHeight), OUT_W, OUT_H);
+    const bad = lb.mean < 70 || lb.imbalance > 0.2;
+    f.light.className = `light ${bad ? 'bad' : 'ok'}`;
+    f.light.textContent = lb.mean < 70 ? 'Too dark. Face the light.' : lb.imbalance > 0.2 ? 'Light from one side. Face it head-on.' : 'Light looks good';
+  }, 400);
+  window.addEventListener('hashchange', () => clearInterval(timer), { once: true });
+
+  f.shoot.addEventListener('click', () => {
+    if (!video.videoWidth) return;
+    clearInterval(timer);
+    go(toPortrait(video, video.videoWidth, video.videoHeight));
+  });
 }
 
 // ---- router ------------------------------------------------------------------------------
@@ -370,7 +276,6 @@ function route() {
   stopCamera();
   let name = location.hash.slice(1) || 'home';
   if (!screens[name]) name = 'home';
-  if (!state.run && !['intro', 'setup', 'privacy', 'settings'].includes(name)) name = 'intro';
   screens[name]();
 }
 
@@ -379,6 +284,7 @@ route();
 
 api.config().then((c) => {
   cfg = c;
-  if (!c.configured) banner('The server has no YouCam API key yet. Scoring will not work until it is set.');
-  else if (c.needsCode && !state.accessCode) banner('This demo needs an access code before it can score photos. Add it in Settings.');
+  if (!c.configured) banner('The server has no YouCam API key yet. Scans will not work until it is set.');
+  else if (c.needsCode && !state.accessCode) banner('This demo needs an access code before it can scan. Add it in Settings.');
 });
+

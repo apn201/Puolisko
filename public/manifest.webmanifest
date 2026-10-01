@@ -1,10 +1,10 @@
 {
   "name": "Puolisko",
   "short_name": "Puolisko",
-  "description": "Split-face product testing. Your own face as its own control group.",
+  "description": "One half beautiful, one half monstrous. The skin AI judges both.",
   "start_url": "./#home",
   "display": "standalone",
-  "background_color": "#f6f4ef",
-  "theme_color": "#f6f4ef",
+  "background_color": "#0d0911",
+  "theme_color": "#0d0911",
   "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
 }

@@ -9,7 +9,7 @@
 if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === '_lib.php') { http_response_code(404); exit; }
 
 const YC_BASE = 'https://yce-api-01.makeupar.com';
-const YC_CONCERNS = ['redness', 'acne', 'pore', 'texture', 'age_spot', 'oiliness'];
+const YC_CONCERNS = ['wrinkle', 'redness', 'dark_circle_v2', 'age_spot'];
 
 function pk_config(string $name): string {
     static $file = null;

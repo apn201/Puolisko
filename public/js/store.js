@@ -1,7 +1,13 @@
-// Everything the app keeps lives here, in this browser's localStorage. Numbers only, never photos.
-const KEY = 'puolisko.v1';
+// The only persistent state: numbers in this browser's localStorage. Never photos, never masks.
+const KEY = 'puolisko.v2';
 
-const empty = () => ({ run: null, entries: [], accessCode: '' });
+const empty = () => ({
+  seenPrivacy: false,
+  accessCode: '',
+  baseline: null,   // { at, halves }
+  beautyCheek: null, // 'left' | 'right', as the player sees themselves in a mirror
+  last: null,       // { at, halves, result }
+});
 
 export function load() {
   try {
@@ -13,45 +19,12 @@ export function load() {
 }
 
 export function save(state) {
-  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* private mode: keep in memory */ }
-}
-
-export function startRun(state, { aName, bName, aCheek }) {
-  state.run = { id: Date.now().toString(36), created: today(), aName, bName, aCheek };
-  state.entries = [];
-  save(state);
-}
-
-export function addEntry(state, entry) {
-  // One photo per day: a retake replaces that day's numbers.
-  state.entries = state.entries.filter((e) => e.date !== entry.date);
-  state.entries.push(entry);
-  state.entries.sort((a, b) => a.date.localeCompare(b.date));
-  save(state);
-}
-
-export function removeEntry(state, date) {
-  state.entries = state.entries.filter((e) => e.date !== date);
-  save(state);
-}
-
-export function exportJson(state) {
-  return JSON.stringify({ app: 'puolisko', version: 1, exported: new Date().toISOString(), run: state.run, entries: state.entries }, null, 2);
-}
-
-export function importJson(state, text) {
-  const o = JSON.parse(text);
-  if (o.app !== 'puolisko' || !o.run || !Array.isArray(o.entries)) throw new Error('Not a Puolisko export');
-  state.run = o.run;
-  state.entries = o.entries.filter((e) => /^\d{4}-\d{2}-\d{2}$/.test(e.date) && e.sides);
-  save(state);
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { /* private mode: memory only */ }
 }
 
 export function wipe() {
-  try { localStorage.removeItem(KEY); } catch { /* ignore */ }
+  try { localStorage.removeItem(KEY); localStorage.removeItem('puolisko.v1'); } catch { /* ignore */ }
 }
 
-export function today(d = new Date()) {
-  const z = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
-}
+// Masks carry pixel counts and densities only; strip anything else before saving.
+export const numbersOnly = (halves) => JSON.parse(JSON.stringify(halves));

@@ -2,7 +2,7 @@
   "name": "puolisko",
   "version": "0.1.0",
   "private": true,
-  "description": "Split-face product testing with the YouCam Skin AI API",
+  "description": "One half beautiful, one half monstrous, judged by the YouCam Skin AI API",
   "type": "module",
   "engines": { "node": ">=18" },
   "scripts": {

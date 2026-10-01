@@ -24,6 +24,8 @@ never commit one, never paste one into a file that is tracked.
 - `server.js` runs the same thing locally: `node server.js` then open http://localhost:3000
 - `public/lab.html` (the Lab) answers the per-side scoring question on real photos. Costs units.
 - `npm run scan` checks tree and full git history for secrets. Runs as a pre-push hook.
-- Budget: 1,000 units. One SD analysis with 5-8 concerns = 12 units.
-- Photos are never stored. Only numbers go to localStorage.
+- Budget: 1,000 units. One SD scan with 4 concerns (wrinkle, redness, dark_circle_v2, age_spot) = 9 units.
+- Game: bare-face baseline, random Beauty/Beast side, final scan, gap = (Beauty - Beast) - baseline offset.
+- Midline from MediaPipe Face Landmarker (CDN, runs in the browser). Never name it "Beauty and the Beast".
+- Photos are never stored. Only numbers go to localStorage. The share card is rendered client side.
 - Never add identification, face matching or third-party faces. See spec, "Rules that bite".

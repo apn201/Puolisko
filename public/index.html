@@ -4,9 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Puolisko</title>
-  <meta name="description" content="Split-face product testing. Your own face as its own control group.">
-  <meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#16181a" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="One half beautiful, one half monstrous. The skin AI judges both.">
+  <meta name="theme-color" content="#0d0911">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="css/app.css">
@@ -17,153 +16,133 @@
       <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><circle cx="16" cy="16" r="13" class="logo-a"/><path d="M16 3a13 13 0 0 1 0 26z" class="logo-b"/></svg>
       Puolisko
     </a>
-    <nav>
-      <a href="#results">Results</a>
-      <a href="#settings" aria-label="Settings">Settings</a>
-    </nav>
+    <nav><a href="#privacy">Privacy</a><a href="#settings">Settings</a></nav>
   </header>
 
   <div id="banner" class="banner" hidden></div>
-
   <main id="view" tabindex="-1"></main>
-
-  <footer class="privacy-line">
-    Your photo goes to the YouCam Skin AI API for scoring and nowhere else. It is deleted right after.
-    Only the numbers stay, in this browser. <a href="#privacy">Details</a>
-  </footer>
 
   <!-- ============ screens ============ -->
 
-  <template id="t-intro">
-    <section class="card hero">
-      <h1>Your face is its own control group.</h1>
-      <p class="lede">Before-and-after photos lie. Different light, different camera, different week of sleep.
-        Put product A on one cheek and product B, or nothing, on the other. Take one photo a day.
-        Both halves share the same light, camera, sleep and diet. The only difference is the product.</p>
-      <p>This is how dermatology trials compare treatments. Puolisko scores each half with the
-        YouCam Skin AI API and tells you, honestly, whether the two sides differ.</p>
-      <p class="muted">Most of the time they do not. That is a real answer, not a failure.</p>
-      <a class="btn primary" href="#setup">Set up a test</a>
-    </section>
-  </template>
-
-  <template id="t-setup">
-    <section class="card">
-      <h1>Pick your split</h1>
-      <form id="setup-form" class="stack">
-        <label>Product A
-          <input name="aName" required maxlength="40" placeholder="e.g. niacinamide serum" autocomplete="off">
-        </label>
-        <label>Product B
-          <input name="bName" maxlength="40" placeholder="leave empty for nothing" autocomplete="off">
-        </label>
-        <fieldset class="seg">
-          <legend>Product A goes on your</legend>
-          <label><input type="radio" name="aCheek" value="left" checked> left cheek</label>
-          <label><input type="radio" name="aCheek" value="right"> right cheek</label>
-        </fieldset>
-        <div class="split-demo" aria-hidden="true">
-          <div class="face"><span class="half a"></span><span class="half b"></span></div>
-          <p class="muted small">As you see yourself in a mirror.</p>
-        </div>
-        <ul class="rules small">
-          <li>Same side, same product, every day. Keep the product off the midline.</li>
-          <li>One photo a day, same place, same time if you can. Face the light head-on.</li>
-          <li>Plan 14 days. Skin changes slowly.</li>
-        </ul>
-        <button class="btn primary" type="submit">Start the test</button>
-      </form>
-    </section>
-  </template>
-
   <template id="t-home">
-    <section class="card run">
-      <div class="pair">
-        <div class="side a"><span class="tag">A</span><strong data-f="aName"></strong><span class="muted small" data-f="aCheek"></span></div>
-        <div class="vs">vs</div>
-        <div class="side b"><span class="tag">B</span><strong data-f="bName"></strong><span class="muted small" data-f="bCheek"></span></div>
-      </div>
-      <div class="progress"><div class="bar" data-f="bar"></div></div>
-      <p class="small"><span data-f="dayText"></span></p>
+    <section class="hero">
+      <div class="split-face" aria-hidden="true"><span class="beauty"></span><span class="beast"></span></div>
+      <h1>One half beautiful.<br>One half monstrous.</h1>
+      <p class="lede">The skin AI judges both. The bigger the gap, the better.</p>
+      <ol class="steps">
+        <li><b>Bare face scan.</b> We measure your natural left/right difference, so nobody wins on genetics.</li>
+        <li><b>Coin flip.</b> The app picks your Beauty side and your Beast side.</li>
+        <li><b>Makeup bag.</b> Glam one half. Ghoul the other.</li>
+        <li><b>Final scan.</b> The AI sees everything you did. Your score is the gap.</li>
+      </ol>
+      <a class="btn primary big" href="#start" data-f="start">Start</a>
+      <a class="btn ghost" href="#result" data-f="last" hidden>Last result</a>
+      <p class="small muted">Each scan uses the YouCam AI Skin Analysis API.</p>
     </section>
-    <section class="card">
-      <p data-f="todayText"></p>
-      <div class="row">
-        <a class="btn primary" href="#capture" data-f="captureBtn">Take today's photo</a>
-        <label class="btn">Import photos<input type="file" accept="image/jpeg,image/png" multiple hidden data-f="import"></label>
+  </template>
+
+  <template id="t-privacy">
+    <section class="card stack">
+      <h1>Before the first scan</h1>
+      <ul class="facts">
+        <li>Your photo goes to the YouCam API for scoring and nowhere else.</li>
+        <li>We do not store it. Only the numbers stay, and only on your phone.</li>
+        <li>YouCam keeps the result for up to 24 hours on their side.</li>
+        <li>Sharing is your decision. We never post anything.</li>
+      </ul>
+      <div class="warn-box">
+        <b>Makeup only.</b> Eyeliner, lipstick, eyeshadow, concealer, face paint made for skin.
+        Nothing that stings, burns or was not made for faces. Not toothpaste.
       </div>
-      <p class="muted small">Import scores photos you took before, one per day. The date comes from the file; you can change it.</p>
+      <p class="small muted">Puolisko only ever scores the face of the person holding the phone. It never compares you with anyone or identifies anyone.</p>
+      <button class="btn primary" data-f="ok">Got it</button>
     </section>
-    <section class="card" data-f="miniResult"></section>
   </template>
 
   <template id="t-capture">
     <section class="capture">
+      <h1 class="cap-title" data-f="title"></h1>
       <div class="viewfinder">
         <video playsinline muted autoplay></video>
         <svg class="guide" viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
           <ellipse cx="150" cy="190" rx="104" ry="138" class="oval"/>
           <line x1="150" y1="30" x2="150" y2="370" class="mid"/>
-          <line x1="80" y1="165" x2="220" y2="165" class="eyes"/>
-          <text x="40" y="380" class="lbl a" data-f="lblL"></text>
-          <text x="260" y="380" class="lbl b" data-f="lblR" text-anchor="end"></text>
+          <text x="40" y="385" class="lbl" data-f="lblL"></text>
+          <text x="260" y="385" class="lbl" data-f="lblR" text-anchor="end"></text>
         </svg>
         <div class="light" data-f="light"></div>
       </div>
-      <p class="small center">Face fills the oval. Nose on the line. Eyes on the cross line. Hair off the forehead, no glasses.</p>
+      <p class="small center muted">Face fills the oval, nose on the line. Hair off the forehead, no glasses.</p>
       <div class="row center">
-        <a class="btn" href="#home">Cancel</a>
-        <button class="btn primary shutter" data-f="shoot" aria-label="Take photo">Take photo</button>
+        <label class="btn ghost">Use a photo<input type="file" accept="image/jpeg,image/png" hidden data-f="file"></label>
+        <button class="btn primary shutter" data-f="shoot">Scan · 9 units</button>
       </div>
     </section>
   </template>
 
-  <template id="t-review">
-    <section class="card">
-      <h1 data-f="title">Check the split</h1>
-      <div class="review-img">
-        <canvas data-f="canvas"></canvas>
-        <div class="midline" data-f="midline"></div>
-        <span class="lbl-a" data-f="labelL"></span>
-        <span class="lbl-b" data-f="labelR"></span>
+  <template id="t-scanning">
+    <section class="scanning">
+      <div class="scan-img"><canvas data-f="canvas"></canvas><div class="sweep"></div></div>
+      <p class="status big-status" data-f="status" role="status">Sending to YouCam</p>
+      <p class="small muted" data-f="quip"></p>
+      <div class="row center" data-f="retry" hidden>
+        <a class="btn" data-f="back" href="#home">Back</a>
+        <button class="btn primary" data-f="again">Try another photo</button>
       </div>
-      <label class="small">Move the line onto your nose
-        <input type="range" min="0.35" max="0.65" step="0.005" value="0.5" data-f="mid">
-      </label>
-      <div class="row">
-        <button class="btn" type="button" data-f="swap">Swap A and B</button>
-        <label class="small date">Date <input type="date" data-f="date"></label>
-      </div>
-      <p class="small warn" data-f="lightWarn" hidden></p>
-      <p class="small muted">Scoring uses 12 YouCam API units. The photo is sent once and then discarded.</p>
-      <div class="row">
-        <button class="btn" type="button" data-f="cancel">Discard</button>
-        <button class="btn primary" type="button" data-f="score">Score this photo</button>
-      </div>
-      <p class="status" data-f="status" role="status"></p>
     </section>
   </template>
 
-  <template id="t-results">
-    <section class="card verdict" data-f="verdict"></section>
-    <section class="legend small" data-f="legend"></section>
-    <div data-f="concerns"></div>
-    <section class="card">
-      <h2>Photos scored</h2>
-      <ul class="entries" data-f="entries"></ul>
+  <template id="t-coin">
+    <section class="coin-screen">
+      <p class="muted">Baseline saved. Your natural difference: <b data-f="offset"></b> points.</p>
+      <div class="coin" data-f="coin"><span class="face-a">BEAUTY</span><span class="face-b">BEAST</span></div>
+      <h1 data-f="verdict">Flipping…</h1>
+      <div class="sides" data-f="sides" hidden>
+        <div class="side-card beauty">
+          <h2>Beauty · <span data-f="beautyCheek"></span> side</h2>
+          <p>Concealer, foundation, highlighter. Even it out, hide the shadows, glow.</p>
+        </div>
+        <div class="side-card beast">
+          <h2>Beast · <span data-f="beastCheek"></span> side</h2>
+          <p>Eyeliner wrinkles. Red lipstick blotches. Dark eyeshadow under the eye. Brown dots.</p>
+        </div>
+        <p class="small muted">Sides are as you see yourself in a mirror. Keep the midline clean. Makeup only.</p>
+        <a class="btn primary big" href="#final">I'm a monster. Scan me.</a>
+      </div>
     </section>
-    <section class="card method small">
-      <h2>How this is measured</h2>
-      <p>Each photo goes once to the YouCam Skin AI API (skin analysis, SD) for redness, acne, pores, texture,
-        spots and oiliness. The API scores the whole face and returns a detection mask per concern.
-        Puolisko splits each mask at your midline, leaves out a strip over the nose, and measures what share of
-        each half is flagged. Lower is better.</p>
-      <p>Light, camera, sleep and diet move both halves together, so they cancel in the difference A &minus; B.
-        A product effect shows up as that difference drifting over the days. Puolisko fits a line to it and
-        reports the drift with an interval, corrected for testing six concerns at once (Bonferroni). If the
-        interval crosses zero, there is no measurable difference.</p>
-      <p>What it cannot cancel: light from one side, and products spreading across the midline. It measures
-        light balance on every photo and warns you.</p>
+  </template>
+
+  <template id="t-result">
+    <section class="result">
+      <p class="eyebrow" data-f="title"></p>
+      <div class="gap"><span class="gap-label">GAP</span><span class="gap-num" data-f="gap"></span></div>
+      <div class="scores">
+        <div class="score" data-f="scoreL"><span class="name"></span><span class="num"></span></div>
+        <div class="score" data-f="scoreR"><span class="name"></span><span class="num"></span></div>
+      </div>
+      <p class="small muted center" data-f="offsetNote"></p>
+      <div class="heat-wrap" data-f="heatWrap">
+        <canvas data-f="heat"></canvas>
+        <span class="tag-l" data-f="tagL"></span><span class="tag-r" data-f="tagR"></span>
+      </div>
+      <div class="legend small" data-f="legend"></div>
+      <div class="row center" data-f="shareRow">
+        <button class="btn primary big" data-f="share">Share</button>
+      </div>
+      <div class="row center small">
+        <label class="chip"><input type="radio" name="fmt" value="feed" checked> Feed</label>
+        <label class="chip"><input type="radio" name="fmt" value="story"> Story</label>
+        <label class="chip"><input type="checkbox" data-f="shy"> Heatmap only, no face</label>
+      </div>
+      <p class="small muted center" data-f="shareNote"></p>
+      <section class="card">
+        <h2>What the AI saw</h2>
+        <table class="breakdown" data-f="breakdown"></table>
+      </section>
+      <div class="row center">
+        <a class="btn" href="#final">Rescan the monster</a>
+        <a class="btn ghost" href="#start">New game</a>
+      </div>
     </section>
   </template>
 
@@ -171,35 +150,11 @@
     <section class="card stack">
       <h1>Settings</h1>
       <label data-f="codeWrap">Access code
-        <input type="password" data-f="code" autocomplete="off" placeholder="from the author">
+        <input type="password" data-f="code" autocomplete="off" placeholder="from the submission page">
       </label>
-      <p class="small muted" data-f="codeHelp">The public demo asks for a code so the API budget lasts through judging.</p>
-      <div class="row">
-        <button class="btn" data-f="export">Export numbers (JSON)</button>
-        <label class="btn">Load export<input type="file" accept="application/json" hidden data-f="load"></label>
-      </div>
-      <div class="row">
-        <button class="btn" data-f="newRun">Start a new test</button>
-        <button class="btn danger" data-f="wipe">Delete everything</button>
-      </div>
-      <p class="small muted">Diagnostics: <a href="lab.html">Lab</a> runs the per-side scoring checks on test photos.</p>
-    </section>
-  </template>
-
-  <template id="t-privacy">
-    <section class="card stack">
-      <h1>What happens to your photo</h1>
-      <ol>
-        <li>The camera image stays in this page's memory. It is never saved to your phone or to a server.</li>
-        <li>When you tap Score, the photo goes through Puolisko's small server function to the YouCam Skin AI API
-          (Perfect Corp). The function holds the API key and keeps nothing.</li>
-        <li>YouCam returns scores and detection masks. Perfect Corp keeps task results for up to 24 hours, then deletes them.</li>
-        <li>Puolisko turns the masks into numbers and throws the photo and masks away.</li>
-        <li>The numbers stay in this browser's local storage. There is no account and no database. Delete everything
-          in Settings at any time.</li>
-      </ol>
-      <p>Puolisko never compares your face with anyone else's, never identifies anyone, and only ever measures the face
-        of the person holding the phone, when they choose to.</p>
+      <p class="small muted" data-f="codeHelp">The public demo asks for a code so the scan budget lasts through judging.</p>
+      <button class="btn danger" data-f="wipe">Delete my numbers</button>
+      <p class="small muted">Diagnostics: <a href="lab.html">Lab</a> tests what makeup the AI picks up.</p>
     </section>
   </template>
 

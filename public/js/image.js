@@ -23,30 +23,8 @@ export async function fileToCanvas(file) {
 
 export const toJpeg = (canvas, q = 0.92) => canvas.toDataURL('image/jpeg', q);
 
-// Mirror-composite of one half: the half plus its own reflection, so the API sees a whole face.
-// This is the fallback method from the spec. The Lab uses it to compare against mask splitting.
-export function mirrorHalf(canvas, midFrac, side) {
-  const W = canvas.width, H = canvas.height, mid = Math.round(midFrac * W);
-  const half = side === 'imgLeft' ? mid : W - mid;
-  const c = document.createElement('canvas');
-  c.width = half * 2; c.height = H;
-  const ctx = c.getContext('2d');
-  if (side === 'imgLeft') {
-    ctx.drawImage(canvas, 0, 0, half, H, 0, 0, half, H);
-    ctx.save(); ctx.translate(half * 2, 0); ctx.scale(-1, 1);
-    ctx.drawImage(canvas, 0, 0, half, H, 0, 0, half, H);
-    ctx.restore();
-  } else {
-    ctx.drawImage(canvas, mid, 0, half, H, half, 0, half, H);
-    ctx.save(); ctx.translate(half, 0); ctx.scale(-1, 1);
-    ctx.drawImage(canvas, mid, 0, half, H, 0, 0, half, H);
-    ctx.restore();
-  }
-  return c;
-}
-
-// Brightness of the left and right cheek zones, 0..255. Side light is the one confounder that
-// split-face does NOT cancel, so we measure it and warn.
+// Brightness of the left and right cheek zones, 0..255. Light from one side would favour one half,
+// so the camera screen warns about it.
 export function lightBalance(source, w, h) {
   const c = document.createElement('canvas');
   c.width = 48; c.height = 64;
