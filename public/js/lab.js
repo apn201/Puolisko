@@ -67,7 +67,7 @@ $('runMask').addEventListener('click', async () => {
     renderMask(rows);
     status('Done.');
   } catch (e) {
-    status(`Error: ${e.message}`);
+    status(explainError(e));
   } finally {
     $('runMask').disabled = false;
     showRaw();
@@ -127,12 +127,22 @@ $('runMirror').addEventListener('click', async () => {
     $('mirrorTable').innerHTML = html;
     status('Done. Mirror scores are raw_score (higher = healthier); mask numbers are flagged share (higher = worse).');
   } catch (e) {
-    status(`Error: ${e.message}. A rejected composite means the API will not score half faces this way.`);
+    status(explainError(e, true));
   } finally {
     $('runMirror').disabled = false;
     showRaw();
   }
 });
+
+// A network failure means our own server is not answering; only an API error says anything about the photo.
+function explainError(e, composite = false) {
+  if (e instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(e.message)) {
+    return 'Error: the Puolisko server is not answering. Start it with "node server.js" and reload this page. No units were spent.';
+  }
+  if (e.status === 401) return 'Error: this server needs an access code. Enter it above.';
+  if (composite && !e.status) return `Error: ${e.message}. YouCam rejected the composite, so it will not score half faces this way.`;
+  return `Error: ${e.message}`;
+}
 
 function showRaw() {
   if (!raw.length) return;
