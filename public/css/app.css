@@ -163,3 +163,4 @@ input[type=password] { font: inherit; padding: 10px 12px; border-radius: 10px; b
 .lab .shots figcaption { font-size: .75rem; color: var(--muted); overflow-wrap: anywhere; }
 .table-wrap { overflow-x: auto; }
 input[type=range] { width: 100%; accent-color: var(--accent); }
+.link { background: none; border: 0; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; padding: 0; }

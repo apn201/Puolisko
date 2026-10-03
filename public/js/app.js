@@ -163,6 +163,16 @@ const screens = {
     fill(f.scoreR, 'right');
     f.offsetNote.textContent = `Skin score per half, 0 to 100. Gap = Beauty − Beast − your bare-face difference (${signed(last.offset)}).`;
 
+    f.copy.addEventListener('click', async () => {
+      const text = JSON.stringify({ beautyCheek: state.beautyCheek, baseline: state.baseline?.halves, final: state.last.halves, result: last });
+      try {
+        await navigator.clipboard.writeText(text);
+        f.copy.textContent = 'Copied. Paste it into a message.';
+      } catch {
+        prompt('Copy this:', text);
+      }
+    });
+
     f.breakdown.innerHTML = '<tr><th></th><th class="beauty">Beauty</th><th class="beast">Beast</th></tr>';
     for (const p of last.perConcern) {
       const tr = document.createElement('tr');
