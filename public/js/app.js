@@ -8,6 +8,14 @@ import { renderHeatmap, COLORS } from './heatmap.js';
 import { renderCard, shareCard, signed } from './card.js';
 
 const state = store.load();
+// Invite links carry the access code after '#', which browsers never send to the server.
+// e.g. https://example.com/puolisko/#code=abc123
+const invite = location.hash.match(/^#code=([^&]+)/);
+if (invite) {
+  state.accessCode = decodeURIComponent(invite[1]);
+  store.save(state);
+  history.replaceState(null, '', location.pathname + location.search + '#home');
+}
 api.setAccessCode(state.accessCode);
 const view = document.getElementById('view');
 let cfg = { needsCode: false, configured: true };
