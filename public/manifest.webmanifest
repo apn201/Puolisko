@@ -4,7 +4,7 @@
   "description": "One half beautiful, one half monstrous. The skin AI judges both.",
   "start_url": "./#home",
   "display": "standalone",
-  "background_color": "#0d0911",
-  "theme_color": "#0d0911",
+  "background_color": "#120a1c",
+  "theme_color": "#120a1c",
   "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }]
 }
