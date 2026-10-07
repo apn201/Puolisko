@@ -5,6 +5,14 @@ The bigger the gap, the better. Halloween edition.
 
 Entry for the YouCam API Skin AI & eCommerce VTO Hackathon (Perfect Corp, 2026).
 
+## Try it
+
+- Demo video: https://youtu.be/yoGZ7CHOME0
+- Live app: https://helppox.com/puolisko/ (open it on a phone)
+
+The live app asks for an access code. Ask me for it. The free API budget is 1,000 units and one scan costs 9,
+so the code is there to stop a viral moment from using all the credits before the judging.
+
 ## How it plays
 
 1. **Bare face scan.** Puolisko measures your natural left/right difference and subtracts it later, so nobody wins on genetics.
